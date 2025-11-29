@@ -1,0 +1,6 @@
+max:
+echo 2 | sudo tee /sys/devices/platform/gpd_fan/hwmon/hwmon*/pwm1_enable
+
+manual:
+echo 1 | sudo tee /sys/devices/platform/gpd_fan/hwmon/hwmon*/pwm1_enable
+echo 200 | sudo tee /sys/devices/platform/gpd_fan/hwmon/hwmon*/pwm1
