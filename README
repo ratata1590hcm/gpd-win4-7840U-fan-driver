@@ -1,3 +1,6 @@
+load driver:
+sudo insmod ./gpd-fan.ko
+
 max:
 echo 2 | sudo tee /sys/devices/platform/gpd_fan/hwmon/hwmon*/pwm1_enable
 
