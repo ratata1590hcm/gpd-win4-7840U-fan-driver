@@ -1,0 +1,92 @@
+#!/usr/bin/bash
+# gpd_fan_set — Simple fan control for GPD Win 4 (7840U/8840U)
+# Works with the gpd-fan.ko driver
+# Place in /usr/local/bin/gpd_fan_set and chmod +x
+
+set -euo pipefail
+
+# Find the correct hwmon directory (works even after reboot/order changes)
+HWMON_DIR=$(grep -l "gpd-win4-7840u-fan" /sys/class/hwmon/hwmon*/name | head -1 | sed 's|/name$||')
+if [[ -z "$HWMON_DIR" ]]; then
+    echo "Error: GPD fan driver not loaded or hwmon entry not found." >&2
+    echo "Is gpd-fan.ko loaded?" >&2
+    exit 1
+fi
+
+PWM_ENABLE="$HWMON_DIR/pwm1_enable"
+PWM_VALUE="$HWMON_DIR/pwm1"
+
+# Show current status
+show_status() {
+    local enable=$(cat "$PWM_ENABLE" 2>/dev/null || echo "?")
+    local speed=$(cat "$PWM_VALUE" 2>/dev/null || echo "?")
+    local rpm=$(cat "$HWMON_DIR/fan1_input" 2>/dev/null || echo "?")
+    echo "GPD Win 4 Fan Control"
+    echo "──────────────────────"
+    echo "Mode : $( ((enable == 1)) && echo "Manual ($speed/255)" || echo "Auto" )"
+    echo "RPM  : $rpm"
+    echo
+}
+
+# Usage
+usage() {
+    cat <<EOF
+Usage: gpd_fan_set <speed|auto|off|status>
+
+  speed   → 0–255   (e.g. 150, 200, 255)
+  auto    → Let BIOS control the fan
+  off     → Silent mode (minimum safe speed)
+  max     → Full speed (255)
+  status  → Show current fan status
+
+Examples:
+  gpd_fan_set 180          # reasonable gaming speed
+  gpd_fan_set max          # full blast
+  gpd_fan_set off          # almost silent
+  gpd_fan_set auto         # back to BIOS control
+  gpd_fan_set status       # show current mode/RPM
+EOF
+    exit 1
+}
+
+# Need exactly one argument
+[[ $# -eq 1 ]] || usage
+
+case "$1" in
+    status|s)
+        show_status
+        exit 0
+        ;;
+
+    auto|a)
+        echo 0 > "$PWM_ENABLE"
+        echo "Fan control: AUTO (BIOS)"
+        ;;
+
+    off|silent|quiet)
+        echo 1 > "$PWM_ENABLE"
+        echo 60 > "$PWM_VALUE"     # ~30% — safe and nearly silent
+        echo "Fan control: MANUAL (silent mode)"
+        ;;
+
+    max|full|100)
+        echo 1 > "$PWM_ENABLE"
+        echo 255 > "$PWM_VALUE"
+        echo "Fan control: MAX SPEED"
+        ;;
+
+    [0-9]|[1-9][0-9]|[1-9][0-9][0-9]|2[0-4][0-9]|25[0-5])
+        SPEED="$1"
+        echo 1 > "$PWM_ENABLE"
+        echo "$SPEED" > "$PWM_VALUE"
+        echo "Fan speed set to: $SPEED/255"
+        ;;
+
+    *)
+        echo "Invalid argument: $1"
+        usage
+        ;;
+esac
+
+# Show new status
+show_status
